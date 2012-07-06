@@ -15,6 +15,7 @@
 		B9DF770415A396DF00C9DA3C /* GenerateThumbnailForURL.c in Sources */ = {isa = PBXBuildFile; fileRef = B9DF770315A396DF00C9DA3C /* GenerateThumbnailForURL.c */; };
 		B9DF770615A396DF00C9DA3C /* GeneratePreviewForURL.c in Sources */ = {isa = PBXBuildFile; fileRef = B9DF770515A396DF00C9DA3C /* GeneratePreviewForURL.c */; };
 		B9DF770815A396DF00C9DA3C /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = B9DF770715A396DF00C9DA3C /* main.c */; };
+		B9DF771015A3A17000C9DA3C /* libz.1.2.5.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = B9DF770F15A3A17000C9DA3C /* libz.1.2.5.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,12 +24,13 @@
 		B9DF76F715A396DF00C9DA3C /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
 		B9DF76F915A396DF00C9DA3C /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
 		B9DF76FB15A396DF00C9DA3C /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
-		B9DF76FF15A396DF00C9DA3C /* BlenderQL-Info.plist */ = {isa = PBXFileReference; path = "BlenderQL-Info.plist"; sourceTree = "<group>"; };
+		B9DF76FF15A396DF00C9DA3C /* BlenderQL-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "BlenderQL-Info.plist"; sourceTree = "<group>"; };
 		B9DF770115A396DF00C9DA3C /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B9DF770315A396DF00C9DA3C /* GenerateThumbnailForURL.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GenerateThumbnailForURL.c; sourceTree = "<group>"; };
 		B9DF770515A396DF00C9DA3C /* GeneratePreviewForURL.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GeneratePreviewForURL.c; sourceTree = "<group>"; };
 		B9DF770715A396DF00C9DA3C /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
-		B9DF770915A396DF00C9DA3C /* BlenderQL-Prefix.pch */ = {isa = PBXFileReference; path = "BlenderQL-Prefix.pch"; sourceTree = "<group>"; };
+		B9DF770915A396DF00C9DA3C /* BlenderQL-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "BlenderQL-Prefix.pch"; sourceTree = "<group>"; };
+		B9DF770F15A3A17000C9DA3C /* libz.1.2.5.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libz.1.2.5.dylib; path = ../../../../../usr/lib/libz.1.2.5.dylib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +42,7 @@
 				B9DF76F815A396DF00C9DA3C /* ApplicationServices.framework in Frameworks */,
 				B9DF76FA15A396DF00C9DA3C /* CoreServices.framework in Frameworks */,
 				B9DF76FC15A396DF00C9DA3C /* CoreFoundation.framework in Frameworks */,
+				B9DF771015A3A17000C9DA3C /* libz.1.2.5.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -66,6 +69,7 @@
 		B9DF76F415A396DF00C9DA3C /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				B9DF770F15A3A17000C9DA3C /* libz.1.2.5.dylib */,
 				B9DF76F515A396DF00C9DA3C /* QuickLook.framework */,
 				B9DF76F715A396DF00C9DA3C /* ApplicationServices.framework */,
 				B9DF76F915A396DF00C9DA3C /* CoreServices.framework */,
