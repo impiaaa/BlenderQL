@@ -6,29 +6,33 @@
 OSStatus GenerateThumbnailForURL(void *thisInterface, QLThumbnailRequestRef thumbnail, CFURLRef url, CFStringRef contentTypeUTI, CFDictionaryRef options, CGSize maxSize);
 void CancelThumbnailGeneration(void *thisInterface, QLThumbnailRequestRef thumbnail);
 
-#ifdef __LITTLE_ENDIAN__
-#define big16ToNative(x) (((x & 0x00FF) << 8) | ((x & 0xFF00) >> 8))
-#define little16ToNative(x) x
-#define big32ToNative(x) __builtin_bswap32(x)
-#define little32ToNative(x) x
+#define L_ENDIAN    1
+#define B_ENDIAN    0
+
+#ifdef __BIG_ENDIAN__
+#  define ENDIAN_ORDER B_ENDIAN
 #else
-#define big16ToNative(x) x
-#define little16ToNative(x) (((x & 0x00FF) << 8) | ((x & 0xFF00) >> 8))
-#define big32ToNative(x) x
-#define little32ToNative(x) __builtin_bswap32(x)
+#  define ENDIAN_ORDER L_ENDIAN
 #endif
 
-#define CHUNK 16384
+#define SWITCH_INT(a) {                                                       \
+		char s_i, *p_i;                                                       \
+		p_i = (char *)&(a);                                                   \
+		s_i = p_i[0]; p_i[0] = p_i[3]; p_i[3] = s_i;                          \
+		s_i = p_i[1]; p_i[1] = p_i[2]; p_i[2] = s_i;                          \
+	} (void)0
 
-typedef struct _Bheader {
-    char pointersize;
-    char endianness;
-} Bheader;
+/* INTEGER CODES */
+#ifdef __BIG_ENDIAN__
+/* Big Endian */
+#  define MAKE_ID(a, b, c, d) ( (int)(a) << 24 | (int)(b) << 16 | (c) << 8 | (d) )
+#else
+/* Little Endian */
+#  define MAKE_ID(a, b, c, d) ( (int)(d) << 24 | (int)(c) << 16 | (b) << 8 | (a) )
+#endif
 
-typedef struct _Cheader {
-UInt32 code;
-UInt32 length;
-} Cheader;
+#define TEST MAKE_ID('T', 'E', 'S', 'T') /* used as preview between 'REND' and 'GLOB' */
+#define REND MAKE_ID('R', 'E', 'N', 'D')
 
 /* -----------------------------------------------------------------------------
     Generate a thumbnail for file
@@ -42,97 +46,92 @@ OSStatus GenerateThumbnailForURL(void *thisInterface, QLThumbnailRequestRef thum
     CFIndex maxStringSize = CFStringGetMaximumSizeForEncoding(CFStringGetLength(sfileloc), kCFStringEncodingUTF8);
     char *cfileloc = malloc(maxStringSize);
     CFURLGetFileSystemRepresentation(url, true, (UInt8 *)cfileloc, maxStringSize);
-    gzFile *file = gzopen(cfileloc, "rb");
+    gzFile *gzfile = gzopen(cfileloc, "rb");
+    free(cfileloc);
     
-    char identifier[8];
-    gzread(file, identifier, 7);
-    identifier[7] = 0;
-    if (strcmp(identifier, "BLENDER") != 0) {
-        // Not a Blender file
-        gzclose(file);
+    char buf[12];
+    int bhead[24 / sizeof(int)]; /* max size on 64bit */
+    char endian, pointer_size;
+    char endian_switch;
+    int sizeof_bhead;
+
+    /* read the blend file header */
+    if (gzread(gzfile, buf, 12) != 12)
         return noErr;
-    }
-    
-    Bheader head;
-    gzread(file, &head, sizeof(Bheader));
-    
-    char versionnumber[3];
-    gzread(file, versionnumber, 3);
-    if (atoi(versionnumber) < 250) {
-        // Old Blender files have no thumbnails
-        gzclose(file);
+    if (strncmp(buf, "BLENDER", 7))
         return noErr;
-    }
-    
-    Cheader bhead;
-    memset(&bhead, 0, sizeof(Cheader));
-    while (gzread(file, &bhead, sizeof(Cheader)) == sizeof(Cheader)) {
-        if (head.endianness == 'V') {
-            bhead.length = big32ToNative(bhead.length);
-        }
-        else if (head.endianness == 'v') {
-            bhead.length = little32ToNative(bhead.length);
-        }
-        bhead.code = big32ToNative(bhead.code);
-        
-        if (bhead.code == 'REND') {
-            if (gzdirect(file) == 0) {
-                bhead.length += 0x10;
-            }
-            else {
-                bhead.length += 0x0C;
-            }
-            gzseek(file, bhead.length, SEEK_CUR);
+
+    if (buf[7] == '-')
+        pointer_size = 8;
+    else if (buf[7] == '_')
+        pointer_size = 4;
+    else
+        return noErr;
+
+    sizeof_bhead = 16 + pointer_size;
+
+    if (buf[8] == 'V')
+        endian = B_ENDIAN;  /* big: PPC */
+    else if (buf[8] == 'v')
+        endian = L_ENDIAN;  /* little: x86 */
+    else
+        return noErr;
+
+    endian_switch = ((ENDIAN_ORDER != endian)) ? 1 : 0;
+
+    while (gzread(gzfile, bhead, sizeof_bhead) == sizeof_bhead) {
+        if (endian_switch)
+            SWITCH_INT(bhead[1]);  /* length */
+
+        if (bhead[0] == REND) {
+            gzseek(gzfile, bhead[1], SEEK_CUR); /* skip to the next */
         }
         else {
             break;
         }
     }
-    
-    if (bhead.code != 'TEST') {
-        gzclose(file);
-        return noErr;
+
+    /* using 'TEST' since new names segfault when loading in old blenders */
+    if (bhead[0] == TEST) {
+        int size[2];
+
+        if (gzread(gzfile, size, sizeof(size)) != sizeof(size))
+            return noErr;
+
+        if (endian_switch) {
+            SWITCH_INT(size[0]);
+            SWITCH_INT(size[1]);
+        }
+        /* length */
+        bhead[1] -= sizeof(int) * 2;
+
+        /* inconsistent image size, quit early */
+        if (bhead[1] != size[0] * size[1] * sizeof(int))
+            return noErr;
+
+        CFMutableDataRef swappedImgData = CFDataCreateMutable(kCFAllocatorDefault, bhead[1]);
+        int i;
+        size_t bitsPerComponent = 8;
+        size_t bitsPerPixel = 32;
+        size_t bytesPerRow = (size[0]*bitsPerPixel)/8;
+        for (i = 0; i < bhead[1]; i += bytesPerRow) {
+            gzread(gzfile, CFDataGetMutableBytePtr(swappedImgData)+(bhead[1]-i-bytesPerRow), (unsigned int)bytesPerRow);
+        }
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB);
+        CGBitmapInfo info = kCGBitmapByteOrder32Big;
+        CGFloat *decode = NULL;
+        bool shouldInteroplate = 0;
+        CGColorRenderingIntent intent = kCGRenderingIntentDefault;
+        CGDataProviderRef imgDataProvider = CGDataProviderCreateWithCFData(swappedImgData);
+        CFRelease(swappedImgData);
+        CGImageRef image = CGImageCreate(size[0], size[1], bitsPerComponent, bitsPerPixel, bytesPerRow, colorSpace, info, imgDataProvider, decode, shouldInteroplate, intent);
+        CGColorSpaceRelease(colorSpace);
+        CGDataProviderRelease(imgDataProvider);
+        QLThumbnailRequestSetImage(thumbnail, image, NULL);
+        CGImageRelease(image);
     }
     
-    if (gzdirect(file) == 0) {
-        gzseek(file, 0x10, SEEK_CUR);
-    }
-    else {
-        gzseek(file, 0x0C, SEEK_CUR);
-    }
-    
-    UInt32 width;
-    UInt32 height;
-    gzread(file, &width, sizeof(UInt32));
-    gzread(file, &height, sizeof(UInt32));
-    
-    bhead.length -= 8;
-    if (bhead.length != width*height*4) {
-        gzclose(file);
-        return noErr;
-    }
-    
-    CFMutableDataRef swappedImgData = CFDataCreateMutable(kCFAllocatorDefault, bhead.length);
-    int i;
-    size_t bitsPerComponent = 8;
-    size_t bitsPerPixel = 32;
-    size_t bytesPerRow = (width*bitsPerPixel)/8;
-    for (i = 0; i < bhead.length; i += bytesPerRow) {
-        gzread(file, CFDataGetMutableBytePtr(swappedImgData)+(bhead.length-i-bytesPerRow), bytesPerRow);
-    }
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB);
-    CGBitmapInfo info = kCGBitmapByteOrder32Big;
-    CGFloat *decode = NULL;
-    bool shouldInteroplate = 0;
-    CGColorRenderingIntent intent = kCGRenderingIntentDefault;
-    CGDataProviderRef imgDataProvider = CGDataProviderCreateWithCFData(swappedImgData);
-    CFRelease(swappedImgData);
-    CGImageRef image = CGImageCreate(width, height, bitsPerComponent, bitsPerPixel, bytesPerRow, colorSpace, info, imgDataProvider, decode, shouldInteroplate, intent);
-    CGColorSpaceRelease(colorSpace);
-    CGDataProviderRelease(imgDataProvider);
-    QLThumbnailRequestSetImage(thumbnail, image, NULL);
-    CGImageRelease(image);
-    gzclose(file);
+    gzclose(gzfile);
     return noErr;
 }
 
